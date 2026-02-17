@@ -1,0 +1,154 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --primary: #0d47a1;
+  --primary-contrast: #ffffff;
+  --border: #d1d5db;
+  --danger: #b91c1c;
+  --ok: #166534;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-header {
+  padding: 1rem;
+  background: #111827;
+  color: white;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.app-header p {
+  margin: .35rem 0 0;
+  font-size: .9rem;
+  color: #d1d5db;
+}
+
+.container {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  padding: .75rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-top: .75rem;
+}
+
+.grid-two {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+label {
+  display: block;
+  margin-top: .65rem;
+  font-weight: 600;
+}
+
+input, button {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 10px;
+}
+
+input {
+  margin-top: .35rem;
+  border: 1px solid var(--border);
+  padding: .65rem;
+  font-size: 1rem;
+}
+
+button {
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: var(--primary-contrast);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: white;
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+button:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-top: .75rem;
+}
+
+.row > * { flex: 1 1 180px; }
+
+#signatureCanvas {
+  width: 100%;
+  height: 180px;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  touch-action: none;
+  background: #fff;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: .92rem;
+}
+
+.status {
+  margin-top: .6rem;
+  font-weight: 700;
+}
+
+.badge {
+  display: inline-block;
+  margin-top: .5rem;
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  font-size: .8rem;
+}
+
+.badge-online {
+  background: #dcfce7;
+  color: var(--ok);
+}
+
+.badge-offline {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+.queue {
+  margin: .5rem 0 0;
+  padding-left: 1rem;
+}
+
+@media (min-width: 860px) {
+  .grid-two { grid-template-columns: 1fr 1fr; }
+}

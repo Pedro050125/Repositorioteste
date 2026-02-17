@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' blob: data:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+    />
+    <meta http-equiv="Referrer-Policy" content="no-referrer" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <title>Assinatura Eletrônica de PDF</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Assinatura Eletrônica de PDF</h1>
+      <p>Fluxo seguro, auditável e otimizado para celular.</p>
+      <span id="networkBadge" class="badge badge-online" aria-live="polite">Online</span>
+    </header>
+
+    <main class="container">
+      <section class="card">
+        <h2>1) Documento</h2>
+        <label for="pdfFile">Selecione o PDF (máx. 10 MB)</label>
+        <input id="pdfFile" type="file" accept="application/pdf" />
+        <p id="fileInfo" class="muted">Nenhum arquivo selecionado.</p>
+      </section>
+
+      <section class="card grid-two">
+        <div>
+          <h2>2) Dados do assinante</h2>
+          <label for="fullName">Nome completo</label>
+          <input id="fullName" maxlength="120" autocomplete="name" />
+
+          <label for="cpf">CPF</label>
+          <input id="cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" />
+
+          <label for="phone">Telefone</label>
+          <input id="phone" inputmode="tel" maxlength="16" placeholder="(00) 00000-0000" />
+
+          <label for="signDate">Data</label>
+          <input id="signDate" type="date" />
+        </div>
+
+        <div>
+          <h2>3) Rubrica visual</h2>
+          <p class="muted">
+            A rubrica visual é evidência complementar. A assinatura digital criptográfica deve ser aplicada no backend.
+          </p>
+          <canvas id="signatureCanvas" aria-label="Área de assinatura"></canvas>
+          <div class="row">
+            <button id="clearSignature" type="button" class="secondary">Limpar</button>
+            <button id="saveDraft" type="button" class="secondary">Salvar rascunho offline</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>4) Finalização segura</h2>
+        <ul class="muted">
+          <li>Calcula hash SHA-256 do PDF no cliente.</li>
+          <li>Envia PDF + metadados + rubrica para o backend assinar em padrão PAdES.</li>
+          <li>Mantém fila offline com reenvio automático ao voltar conexão.</li>
+        </ul>
+        <div class="row">
+          <button id="signAndSend" type="button">Assinar e enviar</button>
+          <button id="retryQueue" type="button" class="secondary">Reenviar pendências</button>
+        </div>
+        <p id="status" class="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <template id="queueItemTpl">
+      <li><span class="name"></span> · <span class="state"></span></li>
+    </template>
+
+    <section class="container card">
+      <h2>Fila offline</h2>
+      <ul id="queueList" class="queue"></ul>
+    </section>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
