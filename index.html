@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>HSE - Assinatura Digital (DHL) — Correção Final</title>
+<style>
+:root{--dhl-yellow:#ffcc00;--dhl-red:#d40511;--bg:#fff8e1;--pen-blue:#0047ab}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#111;font-family:Inter,Arial,sans-serif}
+header{background:var(--dhl-red);color:var(--dhl-yellow);padding:14px;text-align:center}
+.container{max-width:1100px;margin:14px auto;padding:12px}
+.card{background:#fff;border-radius:10px;padding:12px;margin-top:12px;box-shadow:0 6px 18px rgba(0,0,0,0.06)}
+.menu{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bigbtn{background:var(--dhl-yellow);color:#000;padding:16px;border-radius:10px;text-align:center;font-weight:700;cursor:pointer}
+button{background:var(--dhl-red);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+button.secondary{background:var(--dhl-yellow);color:#000}
+input,select,textarea{padding:8px;border:1px solid #ccc;border-radius:6px;width:100%}
+.editor{display:flex;gap:12px;margin-top:12px}
+.leftpanel{width:240px}
+.viewer{flex:1;position:relative;background:#fafafa;border-radius:8px;padding:8px;overflow:auto}
+#pdf-wrapper{position:relative;display:inline-block}
+#pdf-canvas{display:block;border:1px solid #ddd;max-width:100%}
+#overlayContainer{position:absolute;left:0;top:0;pointer-events:auto}
+.overlay-box{position:absolute;background:rgba(255,255,255,0.95);border:1px dashed var(--dhl-red);border-radius:6px;padding:6px 8px;cursor:grab;display:flex;align-items:center;justify-content:center;font-weight:700;user-select:none;touch-action:none}
+.resizer{position:absolute;width:12px;height:12px;right:2px;bottom:2px;background:rgba(0,0,0,0.18);cursor:nwse-resize}
+.controls{display:flex;justify-content:center;gap:8px;margin-top:8px}
+#signatureCanvas{width:100%;height:120px;border:1px solid #ccc;border-radius:6px}
+.checkbox-box{display:inline-flex;align-items:center;gap:8px}
+.checkbox-x{display:inline-block;width:20px;height:20px;border:2px solid #333;border-radius:4px;text-align:center;line-height:16px;cursor:pointer;font-weight:900;user-select:none}
+@media(max-width:900px){.editor{flex-direction:column}.leftpanel{width:100%}}
+
+@font-face{font-family:'Delivery';src:url('https://fonts.cdnfonts.com/s/10165/Delivery.woff') format('woff');font-display:swap}
+.overlay-box, input { font-family:'Delivery','Arial Narrow','Arial',sans-serif; }
+</style>
+</head>
+<body>
+<header><h1>ASSINATURA DIGITAL — HSE (DHL)</h1></header>
+
+<div class="container">
+  <div id="loginView" class="card">
+    <label>Usuário</label>
+    <input id="username" placeholder="Usuário" autocomplete="username" />
+    <label style="margin-top:8px">Senha</label>
+    <input id="password" type="password" placeholder="Senha" autocomplete="current-password" />
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button id="loginBtn">Entrar</button>
+      <button id="samplePdfBtn" class="secondary">PDF Exemplo</button>
+    </div>
+    <small style="display:block;margin-top:8px;color:#444">Credenciais demo: <b>HSE</b> / <b>Silver</b></small>
+  </div>
+
+  <div id="menuView" class="card" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div><strong>Menu Principal</strong></div>
+      <div><button id="logoutBtn" class="secondary">Sair</button></div>
+    </div>
+    <div class="menu" style="margin-top:12px">
+      <div class="bigbtn" id="edicaoBtn">2 — Edição</div>
+      <div class="bigbtn" id="assinaturaBtn">1 — Assinatura</div>
+    </div>
+    <div style="margin-top:12px">
+      <button id="downloadAllBtn">Baixar Assinaturas (ZIP)</button>
+    </div>
+  </div>
+
+  <div id="editView" class="card" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <strong>Edição (posicione por página)</strong>
+      <div><button id="backToMenuFromEdit" class="secondary">Voltar</button></div>
+    </div>
+
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <button id="updateFileBtn">Atualizar arquivo (PDF)</button>
+      <input id="fileInput" type="file" accept="application/pdf" style="display:none" />
+      <span id="fileName" style="margin-left:8px;color:#666"></span>
+      <label style="margin-left:12px"><input type="checkbox" id="toggleGrid" checked /> Mostrar grade</label>
+      <button id="openCertEditor" class="secondary" style="margin-left:12px">Editar Certificado</button>
+    </div>
+
+    <div class="editor">
+      <div class="leftpanel">
+        <p><strong>Adicionar campos</strong></p>
+        <button id="addName">Nome</button><div style="height:6px"></div>
+        <button id="addCpf">CPF/Matrícula</button><div style="height:6px"></div>
+        <button id="addCompany">Empresa</button><div style="height:6px"></div>
+        <button id="addPhone">Telefone</button><div style="height:6px"></div>
+        <button id="addDate">Data</button><div style="height:6px"></div>
+        <button id="addSignature">Assinatura</button><div style="height:6px"></div>
+        <button id="addEfetivo">Efetivo DHL (checkbox)</button><div style="height:6px"></div>
+        <button id="addTerceirizado">Terceirizado (checkbox)</button><div style="height:10px"></div>
+        <button id="saveTemplateBtn">Salvar posições</button>
+      </div>
+
+      <div class="viewer">
+        <div id="pdf-wrapper">
+          <canvas id="pdf-canvas"></canvas>
+          <div id="overlayContainer"></div>
+        </div>
+        <div class="controls">
+          <button id="prevPage">◀ Página anterior</button>
+          <div id="pageIndicator">- / -</div>
+          <button id="nextPage">Página seguinte ▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="editCertView" class="card" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <strong>Edição — Certificado (posicione por página)</strong>
+      <div><button id="backToMenuFromEditCert" class="secondary">Voltar</button></div>
+    </div>
+
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <button id="updateFileCertBtn">Atualizar arquivo (PDF - Certificado)</button>
+      <input id="fileInputCert" type="file" accept="application/pdf" style="display:none" />
+      <span id="fileNameCert" style="margin-left:8px;color:#666"></span>
+      <label style="margin-left:12px"><input type="checkbox" id="toggleGridCert" checked /> Mostrar grade</label>
+    </div>
+
+    <div class="editor">
+      <div class="leftpanel">
+        <p><strong>Adicionar campos (Certificado)</strong></p>
+        <button id="addCertName">Nome</button><div style="height:6px"></div>
+        <button id="addCertCpf">CPF</button><div style="height:6px"></div>
+        <button id="addCertStart">Data Inicial</button><div style="height:6px"></div>
+        <button id="addCertEnd">Data Final</button><div style="height:6px"></div>
+        <button id="addCertIssue">Data Emissão</button><div style="height:6px"></div>
+        <button id="addCertSignature">Assinatura</button><div style="height:10px"></div>
+        <button id="saveCertTemplateBtn">Salvar posições (Certificado)</button>
+      </div>
+
+      <div class="viewer">
+        <div id="pdf-wrapper-cert">
+          <canvas id="pdf-canvas-cert"></canvas>
+          <div id="overlayContainerCert"></div>
+        </div>
+        <div class="controls">
+          <button id="prevPageCert">◀ Página anterior</button>
+          <div id="pageIndicatorCert">- / -</div>
+          <button id="nextPageCert">Página seguinte ▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="signView" class="card" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <strong>Assinatura</strong>
+      <div><button id="backToMenuFromSign" class="secondary">Voltar</button></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>Empresa</label>
+      <input id="signCompany" type="text" />
+      <label style="margin-top:8px">Telefone</label>
+      <input id="signPhone" type="text" />
+      <label style="margin-top:8px">Data</label>
+      <input id="signDate" type="text" placeholder="__/__/____" maxlength="10" />
+      <div style="margin-top:8px" class="checkbox-box">
+        <div id="boxEfetivo" class="checkbox-x"></div><label for="boxEfetivo">Efetivo DHL</label>
+        <div style="width:16px"></div>
+        <div id="boxTerceiro" class="checkbox-x"></div><label for="boxTerceiro">Terceirizado</label>
+      </div>
+
+      <label style="margin-top:8px;display:block">Nome</label>
+      <input id="signName" type="text" />
+      <label style="margin-top:8px">CPF/Matrícula</label>
+      <input id="signCpf" type="text" />
+
+      <label style="margin-top:8px;display:block">
+        <input id="acceptTerms" type="checkbox" />
+        Declaro ciência e concordância com o conteúdo do documento.
+      </label>
+
+      <p style="margin-top:8px">Assine abaixo:</p>
+      <canvas id="signatureCanvas"></canvas>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="clearSignature">Limpar</button>
+        <button id="confirmSignature">Confirmar</button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="openCertSign" class="secondary">Assinar Certificado</button>
+      </div>
+
+      <small id="integrityInfo" style="display:block;margin-top:8px;color:#444"></small>
+      <div id="previewHolder" style="margin-top:12px;min-height:200px;background:#fafafa;border:1px solid #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center">Preview vazio</div>
+      <div style="margin-top:12px;text-align:center"><button id="finalizeSignature">Finalizar Assinatura Digital</button></div>
+    </div>
+  </div>
+
+  <div id="certSignView" class="card" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <strong>Assinatura — Certificado</strong>
+      <div><button id="backToMenuFromCertSign" class="secondary">Voltar</button></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>Nome</label>
+      <input id="certSignNome" type="text" />
+      <label style="margin-top:8px">CPF</label>
+      <input id="certSignCpf" type="text" />
+      <label style="margin-top:8px">Data Inicial</label>
+      <input id="certSignStart" type="text" placeholder="__/__/____" maxlength="10" />
+      <label style="margin-top:8px">Data Final</label>
+      <input id="certSignEnd" type="text" placeholder="__/__/____" maxlength="10" />
+      <label style="margin-top:8px">Data Emissão</label>
+      <input id="certSignIssue" type="text" placeholder="__/__/____" maxlength="10" />
+
+      <label style="margin-top:8px;display:block">
+        <input id="acceptTermsCert" type="checkbox" />
+        Declaro ciência e concordância com o conteúdo do certificado.
+      </label>
+
+      <p style="margin-top:8px">Assine abaixo (certificado):</p>
+      <canvas id="certSignatureCanvas" style="width:100%;height:120px;border:1px solid #ccc;border-radius:6px"></canvas>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="clearCertSignature">Limpar</button>
+        <button id="confirmCertSignature">Confirmar</button>
+      </div>
+
+      <small id="integrityInfoCert" style="display:block;margin-top:8px;color:#444"></small>
+      <div id="previewHolderCert" style="margin-top:12px;min-height:200px;background:#fafafa;border:1px solid #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center">Preview vazio</div>
+      <div style="margin-top:12px;text-align:center"><button id="finalizeCertSignature">Finalizar Assinatura do Certificado</button></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.7.1/dist/jszip.min.js"></script>
+
+<script>
+(() => {
+  const USER='HSE', PASS='Silver';
+  const STORAGE_KEY='hse_positions_v2';
+  const STORAGE_KEY_CERT='hse_cert_positions_v1';
+  const QUEUE_KEY='hse_signed_queue_v3';
+  const AUDIT_KEY='hse_audit_queue_v1';
+  const SCALE = 1.3;
+  const SCALE_CERT = 1.2;
+  const SIGN_SCALE = 0.5;
+  const GRID_SPACING = 50;
+
+  const $ = id => document.getElementById(id);
+  let state = {
+    bytes: null, pdf: null, page:1, total:0,
+    positions: JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'),
+    bytesCert: null, pdfCert: null, pageCert:1, totalCert:0,
+    certPositions: JSON.parse(localStorage.getItem(STORAGE_KEY_CERT) || '{}'),
+    signedQueue: JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'),
+    auditQueue: JSON.parse(localStorage.getItem(AUDIT_KEY) || '[]'),
+    lastBlob: null,
+    lastAudit: null
+  };
+
+  let signaturePad = null;
+  let certSignaturePad = null;
+  let lastSignatureEvents = [];
+  let lastCertSignatureEvents = [];
+
+  function on(el, ev, fn){ if(!el) return; el.addEventListener(ev, fn); }
+  function safeText(v){ return (v || '').toString().trim(); }
+  function onlyDigits(v){ return (v || '').replace(/\D/g, ''); }
+  function validDateBR(v){ return /^\d{2}\/\d{2}\/\d{4}$/.test(v || ''); }
+  function validCpfOrMatricula(v){
+    const clean = onlyDigits(v);
+    return clean.length >= 6;
+  }
+
+  async function sha256Hex(input){
+    const data = typeof input === 'string' ? new TextEncoder().encode(input) : input;
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+
+  async function buildAuditPayload(type, filename, blob, formData, signatureEvents){
+    const now = new Date();
+    const u8 = new Uint8Array(await blob.arrayBuffer());
+    const pdfHash = await sha256Hex(u8);
+    const eventHash = await sha256Hex(JSON.stringify(signatureEvents || []));
+    const payload = {
+      version: '1.0',
+      signatureType: type,
+      filename,
+      signedAtISO: now.toISOString(),
+      timezoneOffsetMin: now.getTimezoneOffset(),
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      pdfSha256: pdfHash,
+      signatureEventsSha256: eventHash,
+      formSnapshot: formData,
+      legalNotice: 'Assinatura eletrônica com evidências de integridade local (hash SHA-256). Para assinatura digital qualificada (ICP-Brasil/PAdES), integrar certificado digital A3/A1 e provedor com carimbo de tempo.'
+    };
+    payload.auditSha256 = await sha256Hex(JSON.stringify(payload));
+    return payload;
+  }
+
+  function showIntegrityInfo(targetId, audit){
+    const el = $(targetId);
+    if(!el || !audit) return;
+    el.textContent = `Integridade SHA-256 do PDF: ${audit.pdfSha256.slice(0,16)}... | Evidência: ${audit.auditSha256.slice(0,16)}...`;
+  }
+
+  on($('loginBtn'),'click', ()=> { if($('username').value===USER && $('password').value===PASS){ $('loginView').style.display='none'; $('menuView').style.display='block'; } else alert('Credenciais inválidas'); });
+  on($('logoutBtn'),'click', ()=> location.reload());
+  on($('samplePdfBtn'),'click', insertSamplePdf);
+  on($('edicaoBtn'),'click', ()=>{ $('menuView').style.display='none'; $('editView').style.display='block'; if(state.pdf) renderPage(); });
+  on($('assinaturaBtn'),'click', ()=>{ $('menuView').style.display='none'; $('signView').style.display='block'; ensureSignaturePad(); });
+  on($('backToMenuFromEdit'),'click', ()=>{ $('editView').style.display='none'; $('menuView').style.display='block'; });
+  on($('backToMenuFromSign'),'click', ()=>{ $('signView').style.display='none'; $('menuView').style.display='block'; });
+  on($('openCertEditor'),'click', ()=>{ $('editView').style.display='none'; $('editCertView').style.display='block'; if(state.pdfCert) renderPageCert(); });
+  on($('backToMenuFromEditCert'),'click', ()=>{ $('editCertView').style.display='none'; $('menuView').style.display='block'; });
+  on($('openCertSign'),'click', ()=>{ $('signView').style.display='none'; $('certSignView').style.display='block'; ensureCertSignaturePad(); });
+  on($('backToMenuFromCertSign'),'click', ()=>{ $('certSignView').style.display='none'; $('menuView').style.display='block'; });
+
+  on($('updateFileBtn'),'click', ()=>$('fileInput').click());
+  on($('fileInput'),'change', async e => {
+    const f = e.target.files[0]; if(!f) return;
+    $('fileName').textContent = f.name;
+    state.bytes = await f.arrayBuffer();
+    await loadPdf(state.bytes);
+  });
+
+  on($('updateFileCertBtn'),'click', ()=>$('fileInputCert').click());
+  on($('fileInputCert'),'change', async e => {
+    const f = e.target.files[0]; if(!f) return;
+    $('fileNameCert').textContent = f.name;
+    state.bytesCert = await f.arrayBuffer();
+    await loadPdfCert(state.bytesCert);
+  });
+
+  on($('prevPage'),'click', ()=>{ if(state.page>1){ state.page--; renderPage(); }});
+  on($('nextPage'),'click', ()=>{ if(state.page<state.total){ state.page++; renderPage(); }});
+  on($('prevPageCert'),'click', ()=>{ if(state.pageCert>1){ state.pageCert--; renderPageCert(); }});
+  on($('nextPageCert'),'click', ()=>{ if(state.pageCert<state.totalCert){ state.pageCert++; renderPageCert(); }});
+
+  on($('addName'),'click', ()=>addField('name'));
+  on($('addCpf'),'click', ()=>addField('cpf'));
+  on($('addCompany'),'click', ()=>addField('company'));
+  on($('addPhone'),'click', ()=>addField('phone'));
+  on($('addDate'),'click', ()=>addField('date'));
+  on($('addSignature'),'click', ()=>addField('signature'));
+  on($('addEfetivo'),'click', ()=>addField('efetivo'));
+  on($('addTerceirizado'),'click', ()=>addField('terceirizado'));
+  on($('saveTemplateBtn'),'click', ()=>{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state.positions)); alert('Posições salvas por página.'); });
+
+  on($('addCertName'),'click', ()=>addFieldCert('cert_name'));
+  on($('addCertCpf'),'click', ()=>addFieldCert('cert_cpf'));
+  on($('addCertStart'),'click', ()=>addFieldCert('cert_start'));
+  on($('addCertEnd'),'click', ()=>addFieldCert('cert_end'));
+  on($('addCertIssue'),'click', ()=>addFieldCert('cert_issue'));
+  on($('addCertSignature'),'click', ()=>addFieldCert('cert_signature'));
+  on($('saveCertTemplateBtn'),'click', ()=>{ localStorage.setItem(STORAGE_KEY_CERT, JSON.stringify(state.certPositions)); alert('Posições (Certificado) salvas por página.'); });
+
+  on($('confirmSignature'),'click', onConfirmSignature);
+  on($('clearSignature'),'click', ()=>{ if(signaturePad) signaturePad.clear(); lastSignatureEvents=[]; });
+  on($('finalizeSignature'),'click', onFinalizeSignature);
+
+  on($('confirmCertSignature'),'click', async ()=> {
+    ensureCertSignaturePad();
+    if(!$('acceptTermsCert').checked){ alert('É necessário declarar concordância para assinar o certificado.'); return; }
+    if(certSignaturePad.isEmpty()){ alert('A assinatura do certificado não pode estar vazia.'); return; }
+    try{
+      const formData = {
+        name: safeText($('certSignNome').value),
+        cpf: safeText($('certSignCpf').value),
+        start: safeText($('certSignStart').value),
+        end: safeText($('certSignEnd').value),
+        issue: safeText($('certSignIssue').value)
+      };
+      if(!validCpfOrMatricula(formData.cpf)){ alert('CPF inválido.'); return; }
+      if(!validDateBR(formData.start) || !validDateBR(formData.end) || !validDateBR(formData.issue)){ alert('Datas devem estar no formato dd/mm/aaaa.'); return; }
+      const blob = await generatePdfCertWithData({ ...formData, signatureDataUrl: certSignaturePad.toDataURL() });
+      const filename = `${(formData.name||'Certificado').replace(/[^a-z0-9]/gi,'_')}_${(formData.cpf||'CPF').replace(/[^a-z0-9]/gi,'_')}.pdf`;
+      const audit = await buildAuditPayload('certificado', filename, blob, formData, lastCertSignatureEvents);
+      state.lastBlob = blob;
+      state.lastAudit = audit;
+      showIntegrityInfo('integrityInfoCert', audit);
+      const url = URL.createObjectURL(blob);
+      $('previewHolderCert').innerHTML = `<iframe src="${url}" style="width:100%;height:300px;border:0"></iframe>`;
+    } catch(err){ console.error(err); alert('Erro ao gerar preview do certificado'); }
+  });
+
+  on($('clearCertSignature'),'click', ()=>{ if(certSignaturePad) certSignaturePad.clear(); lastCertSignatureEvents=[]; });
+  on($('finalizeCertSignature'),'click', async ()=> {
+    try{
+      if(!state.lastBlob || !state.lastAudit){ alert('Gere o preview antes'); return; }
+      const rawName = $('certSignNome').value || 'Certificado';
+      const rawCpf = $('certSignCpf').value || 'CPF';
+      const filename = `${(rawName||'').replace(/[^a-z0-9]/gi,'_')}_${(rawCpf||'').replace(/[^a-z0-9]/gi,'_')}.pdf`;
+      downloadBlob(state.lastBlob, filename);
+      const base64 = await blobToBase64(state.lastBlob);
+      state.signedQueue.push({ filename, base64 });
+      state.auditQueue.push({ filename: `${filename}.audit.json`, content: state.lastAudit });
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(state.signedQueue));
+      localStorage.setItem(AUDIT_KEY, JSON.stringify(state.auditQueue));
+      $('certSignNome').value=''; $('certSignCpf').value=''; $('certSignStart').value=''; $('certSignEnd').value=''; $('certSignIssue').value=''; $('acceptTermsCert').checked=false;
+      certSignaturePad.clear(); lastCertSignatureEvents=[];
+      $('previewHolderCert').textContent='Preview vazio'; $('integrityInfoCert').textContent='';
+      state.lastBlob=null; state.lastAudit=null;
+      alert('Assinatura de certificado finalizada com evidências de integridade local.');
+    } catch(err){ console.error(err); alert('Erro ao finalizar certificado'); }
+  });
+
+  const boxEf = $('boxEfetivo'), boxTer = $('boxTerceiro');
+  if(boxEf && boxTer){
+    boxEf.addEventListener('click', ()=>{ boxEf.textContent = boxEf.textContent==='X' ? '' : 'X'; if(boxEf.textContent==='X') boxTer.textContent=''; });
+    boxTer.addEventListener('click', ()=>{ boxTer.textContent = boxTer.textContent==='X' ? '' : 'X'; if(boxTer.textContent==='X') boxEf.textContent=''; });
+  }
+
+  const signDate = $('signDate');
+  if(signDate) on(signDate,'input', e => { let v = e.target.value.replace(/\D/g,'').slice(0,8); if(v.length>=5) v = v.replace(/(\d{2})(\d{2})(\d{0,4})/,'$1/$2/$3'); else if(v.length>=3) v = v.replace(/(\d{2})(\d{0,2})/,'$1/$2'); e.target.value = v; });
+  ['certSignStart','certSignEnd','certSignIssue'].forEach(id=>{
+    const el = $(id);
+    if(el) on(el,'input', e => { let v = e.target.value.replace(/\D/g,'').slice(0,8); if(v.length>=5) v = v.replace(/(\d{2})(\d{2})(\d{0,4})/,'$1/$2/$3'); else if(v.length>=3) v = v.replace(/(\d{2})(\d{0,2})/,'$1/$2'); e.target.value = v; });
+  });
+
+  async function loadPdf(bytes){
+    try{ const loading = pdfjsLib.getDocument({ data: bytes }); state.pdf = await loading.promise; state.page = 1; state.total = state.pdf.numPages; renderPage(); }
+    catch(err){ console.error(err); alert('Erro ao processar PDF'); }
+  }
+
+  async function renderPage(){
+    if(!state.pdf) return;
+    const page = await state.pdf.getPage(state.page);
+    const viewport = page.getViewport({ scale: SCALE });
+    const canvas = $('pdf-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    canvas.style.width = viewport.width + 'px'; canvas.style.height = viewport.height + 'px';
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    $('pageIndicator').textContent = `${state.page} / ${state.total}`;
+    drawGridIfNeeded(ctx, canvas.width, canvas.height, 'toggleGrid');
+    renderOverlay();
+  }
+
+  async function loadPdfCert(bytes){
+    try{ const loading = pdfjsLib.getDocument({ data: bytes }); state.pdfCert = await loading.promise; state.pageCert = 1; state.totalCert = state.pdfCert.numPages; renderPageCert(); }
+    catch(err){ console.error(err); alert('Erro ao processar PDF (cert)'); }
+  }
+
+  async function renderPageCert(){
+    if(!state.pdfCert) return;
+    const page = await state.pdfCert.getPage(state.pageCert);
+    const viewport = page.getViewport({ scale: SCALE_CERT });
+    const canvas = $('pdf-canvas-cert');
+    const ctx = canvas.getContext('2d');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    canvas.style.width = viewport.width + 'px'; canvas.style.height = viewport.height + 'px';
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    $('pageIndicatorCert').textContent = `${state.pageCert} / ${state.totalCert}`;
+    drawGridIfNeeded(ctx, canvas.width, canvas.height, 'toggleGridCert');
+    renderOverlayCert();
+  }
+
+  function drawGridIfNeeded(ctx,w,h, toggleId){
+    if(!document.getElementById(toggleId)?.checked) return;
+    ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.08)'; ctx.lineWidth=0.5;
+    for(let x=0;x<w;x+=GRID_SPACING){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+    for(let y=0;y<h;y+=GRID_SPACING){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  function renderOverlay(){
+    const canvas = $('pdf-canvas'); const overlay = $('overlayContainer'); overlay.innerHTML = '';
+    overlay.style.width = canvas.width + 'px'; overlay.style.height = canvas.height + 'px'; overlay.style.left = canvas.offsetLeft + 'px'; overlay.style.top = canvas.offsetTop + 'px';
+    state.positions[state.page] = state.positions[state.page] || {};
+    const types = ['name','cpf','company','phone','date','signature','efetivo','terceirizado'];
+    for(const type of types){
+      const d = state.positions[state.page][type]; if(!d) continue;
+      const el = document.createElement('div'); el.className = 'overlay-box'; el.dataset.type = type;
+      if(type==='name') el.textContent='Nome'; else if(type==='cpf') el.textContent='CPF'; else if(type==='company') el.textContent='Empresa'; else if(type==='phone') el.textContent='Telefone'; else if(type==='date') el.textContent='Data'; else if(type==='signature') el.textContent='Assinatura'; else if(type==='efetivo') el.innerHTML = '<span class="checkbox-x">☐</span>'; else if(type==='terceirizado') el.innerHTML = '<span class="checkbox-x">☐</span>';
+      const pixelLeft = Math.round(d.x * canvas.width), pixelTop = Math.round(d.y * canvas.height), pixelW = Math.round((d.w || 0.25) * canvas.width), pixelH = Math.round((d.h || 0.06) * canvas.height);
+      el.style.left = pixelLeft + 'px'; el.style.top = pixelTop + 'px'; el.style.width = pixelW + 'px'; el.style.height = pixelH + 'px'; el.style.lineHeight = (pixelH - 4) + 'px';
+      makeElementDraggable(el, canvas, saveElementPosition);
+      overlay.appendChild(el);
+    }
+  }
+
+  function renderOverlayCert(){
+    const canvas = $('pdf-canvas-cert'); const overlay = $('overlayContainerCert'); overlay.innerHTML = '';
+    overlay.style.width = canvas.width + 'px'; overlay.style.height = canvas.height + 'px'; overlay.style.left = canvas.offsetLeft + 'px'; overlay.style.top = canvas.offsetTop + 'px';
+    state.certPositions[state.pageCert] = state.certPositions[state.pageCert] || {};
+    const keys = Object.keys(state.certPositions[state.pageCert] || {});
+    for(const key of keys){
+      const d = state.certPositions[state.pageCert][key]; if(!d) continue;
+      const el = document.createElement('div'); el.className = 'overlay-box'; el.dataset.type = key;
+      if(key.startsWith('cert_name')) el.textContent='Nome'; else if(key.startsWith('cert_cpf')) el.textContent='CPF'; else if(key.startsWith('cert_start')) el.textContent='Data Inicial'; else if(key.startsWith('cert_end')) el.textContent='Data Final'; else if(key.startsWith('cert_issue')) el.textContent='Data Emissão'; else if(key.startsWith('cert_signature')) el.textContent='Assinatura';
+      const pixelLeft = Math.round(d.x * canvas.width), pixelTop = Math.round(d.y * canvas.height), pixelW = Math.round((d.w || 0.30) * canvas.width), pixelH = Math.round((d.h || 0.08) * canvas.height);
+      el.style.left = pixelLeft + 'px'; el.style.top = pixelTop + 'px'; el.style.width = pixelW + 'px'; el.style.height = pixelH + 'px'; el.style.lineHeight = (pixelH - 4) + 'px';
+      makeElementDraggable(el, canvas, saveElementPositionCert);
+      overlay.appendChild(el);
+    }
+  }
+
+  function addField(type){
+    if(!state.pdf){ alert('Carregue um PDF primeiro.'); return; }
+    state.positions[state.page] = state.positions[state.page] || {};
+    const defaultW=0.25, defaultH=0.06, defaultX=0.1, defaultY=0.1;
+    if(state.positions[state.page][type]) state.positions[state.page][type].x = Math.min(0.9, state.positions[state.page][type].x + 0.03);
+    else state.positions[state.page][type] = { x: defaultX, y: defaultY, w: defaultW, h: defaultH };
+    renderOverlay();
+  }
+
+  function addFieldCert(type){
+    if(!state.pdfCert){ alert('Carregue um PDF (Certificado) primeiro.'); return; }
+    state.certPositions[state.pageCert] = state.certPositions[state.pageCert] || {};
+    const defaultW=0.30, defaultH=0.08, defaultX=0.1, defaultY=0.1;
+    if(type === 'cert_name'){
+      const key = 'cert_name_' + Date.now(); state.certPositions[state.pageCert][key] = { x: defaultX, y: defaultY, w: defaultW, h: defaultH };
+    } else {
+      const key = type;
+      if(state.certPositions[state.pageCert][key]) state.certPositions[state.pageCert][key].x = Math.min(0.9, state.certPositions[state.pageCert][key].x + 0.03);
+      else state.certPositions[state.pageCert][key] = { x: defaultX, y: defaultY, w: defaultW, h: defaultH };
+    }
+    renderOverlayCert();
+  }
+
+  function makeElementDraggable(el, canvas, saveFn){
+    let dragging=false, resizing=false;
+    let startX=0,startY=0,startLeft=0,startTop=0,startW=0,startH=0;
+    let handle = el.querySelector('.resizer');
+    if(!handle){ handle = document.createElement('div'); handle.className='resizer'; el.appendChild(handle); }
+    function down(e){ e.preventDefault(); startX = e.clientX; startY = e.clientY; startLeft = parseInt(el.style.left || 0); startTop = parseInt(el.style.top || 0); startW = el.offsetWidth; startH = el.offsetHeight; if(e.target === handle) resizing = true; else dragging = true; el.setPointerCapture && el.setPointerCapture(e.pointerId); }
+    function move(e){
+      if(dragging){ const dx = e.clientX - startX, dy = e.clientY - startY; let nx = startLeft + dx, ny = startTop + dy; nx = Math.max(-0.1*canvas.width, Math.min(nx, canvas.width - el.offsetWidth + 0.1*canvas.width)); ny = Math.max(-0.1*canvas.height, Math.min(ny, canvas.height - el.offsetHeight + 0.1*canvas.height)); el.style.left = Math.round(nx) + 'px'; el.style.top = Math.round(ny) + 'px'; }
+      else if(resizing){ const dx=e.clientX-startX, dy=e.clientY-startY; let nw = Math.max(30, startW + dx), nh = Math.max(18, startH + dy); nw = Math.min(nw, canvas.width + 0.1*canvas.width - parseInt(el.style.left||0)); nh = Math.min(nh, canvas.height + 0.1*canvas.height - parseInt(el.style.top||0)); el.style.width = Math.round(nw) + 'px'; el.style.height = Math.round(nh) + 'px'; el.style.lineHeight = (parseInt(el.style.height)-4) + 'px'; }
+    }
+    function up(e){ if(dragging || resizing) saveFn && saveFn(el, canvas); dragging=false; resizing=false; el.releasePointerCapture && el.releasePointerCapture(e.pointerId); }
+    el.addEventListener('pointerdown', down); window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  }
+
+  function saveElementPosition(el, canvas){
+    const page = state.page; state.positions[page] = state.positions[page] || {};
+    const x = parseInt(el.style.left||0) / canvas.width, y = parseInt(el.style.top||0) / canvas.height, w = el.offsetWidth / canvas.width, h = el.offsetHeight / canvas.height;
+    state.positions[page][el.dataset.type] = { x, y, w, h }; localStorage.setItem(STORAGE_KEY, JSON.stringify(state.positions));
+  }
+
+  function saveElementPositionCert(el, canvas){
+    const page = state.pageCert; state.certPositions[page] = state.certPositions[page] || {};
+    const x = parseInt(el.style.left||0) / canvas.width, y = parseInt(el.style.top||0) / canvas.height, w = el.offsetWidth / canvas.width, h = el.offsetHeight / canvas.height;
+    state.certPositions[page][el.dataset.type] = { x, y, w, h }; localStorage.setItem(STORAGE_KEY_CERT, JSON.stringify(state.certPositions));
+  }
+
+  function ensureSignaturePad(){
+    if(signaturePad) return;
+    const c = $('signatureCanvas'); const ratio = window.devicePixelRatio || 1;
+    c.width = c.clientWidth * ratio; c.height = 120 * ratio; c.getContext('2d').scale(ratio, ratio);
+    signaturePad = new SignaturePad(c, { penColor: getComputedStyle(document.documentElement).getPropertyValue('--pen-blue') || '#0047ab' });
+    bindSignatureEventCapture(c, 'integration');
+  }
+
+  function ensureCertSignaturePad(){
+    if(certSignaturePad) return;
+    const c = $('certSignatureCanvas'); const ratio = window.devicePixelRatio || 1;
+    c.width = c.clientWidth * ratio; c.height = 120 * ratio; c.getContext('2d').scale(ratio, ratio);
+    certSignaturePad = new SignaturePad(c, { penColor: getComputedStyle(document.documentElement).getPropertyValue('--pen-blue') || '#0047ab' });
+    bindSignatureEventCapture(c, 'cert');
+  }
+
+  function bindSignatureEventCapture(canvas, type){
+    const events = type === 'integration' ? lastSignatureEvents : lastCertSignatureEvents;
+    ['pointerdown','pointermove','pointerup'].forEach(ev => {
+      canvas.addEventListener(ev, e => {
+        if(ev==='pointermove' && e.buttons===0) return;
+        events.push({ t: Date.now(), x: Math.round(e.offsetX), y: Math.round(e.offsetY), e: ev });
+        if(events.length > 2000) events.shift();
+      });
+    });
+  }
+
+  async function onConfirmSignature(){
+    if(!state.bytes){ alert('Carregue o PDF em Edição antes.'); return; }
+    if(!$('acceptTerms').checked){ alert('É necessário declarar concordância para assinar.'); return; }
+    ensureSignaturePad();
+    if(signaturePad.isEmpty()){ alert('Assinatura não pode estar vazia.'); return; }
+
+    const formData = {
+      name: safeText($('signName').value), cpf: safeText($('signCpf').value), company: safeText($('signCompany').value),
+      phone: safeText($('signPhone').value), date: safeText($('signDate').value),
+      efetivo: $('boxEfetivo').textContent==='X', terceirizado: $('boxTerceiro').textContent==='X'
+    };
+
+    if(!formData.name){ alert('Nome é obrigatório.'); return; }
+    if(!validCpfOrMatricula(formData.cpf)){ alert('CPF/Matrícula inválido.'); return; }
+    if(!validDateBR(formData.date)){ alert('Data inválida (use dd/mm/aaaa).'); return; }
+    if(!formData.efetivo && !formData.terceirizado){ alert('Marque Efetivo DHL ou Terceirizado.'); return; }
+
+    try{
+      const blob = await generatePdfWithData({ ...formData, signatureDataUrl: signaturePad.toDataURL() });
+      const filename = makeDownloadFilename(formData.name, formData.cpf);
+      const audit = await buildAuditPayload('integracao', filename, blob, formData, lastSignatureEvents);
+      state.lastBlob = blob;
+      state.lastAudit = audit;
+      showIntegrityInfo('integrityInfo', audit);
+      const url = URL.createObjectURL(blob);
+      $('previewHolder').innerHTML = `<iframe src="${url}" style="width:100%;height:300px;border:0"></iframe>`;
+    } catch(err){ console.error(err); alert('Erro ao gerar preview'); }
+  }
+
+  async function onFinalizeSignature(){
+    try{
+      if(!state.lastBlob || !state.lastAudit){ alert('Gere o preview antes'); return; }
+      const rawName = $('signName').value || 'Assinante';
+      const rawCpf = $('signCpf').value || 'CPF';
+      const filename = makeDownloadFilename(rawName, rawCpf);
+      downloadBlob(state.lastBlob, filename);
+      const base64 = await blobToBase64(state.lastBlob);
+      state.signedQueue.push({ filename, base64 });
+      state.auditQueue.push({ filename: `${filename}.audit.json`, content: state.lastAudit });
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(state.signedQueue));
+      localStorage.setItem(AUDIT_KEY, JSON.stringify(state.auditQueue));
+      $('signName').value=''; $('signCpf').value=''; $('signCompany').value=''; $('signPhone').value=''; $('signDate').value=''; $('acceptTerms').checked=false;
+      $('boxEfetivo').textContent=''; $('boxTerceiro').textContent=''; signaturePad.clear(); lastSignatureEvents=[];
+      $('previewHolder').textContent='Preview vazio'; $('integrityInfo').textContent='';
+      state.lastBlob=null; state.lastAudit=null;
+      alert('Assinatura finalizada com evidências de integridade local.');
+    } catch(err){ console.error(err); }
+  }
+
+  async function generatePdfWithData({ name, cpf, company, phone, date, efetivo, terceirizado, signatureDataUrl }){
+    if(!state.bytes) throw new Error('PDF base não carregado');
+    const { PDFDocument, StandardFonts } = PDFLib;
+    const pdfDoc = await PDFDocument.load(state.bytes);
+    const pages = pdfDoc.getPages();
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    for(let i=0;i<pages.length;i++){
+      const pageNum = i+1; const page = pages[i]; const width = page.getWidth(); const height = page.getHeight();
+      const pagePos = state.positions[pageNum] || {};
+      function drawText(box, text, size=12, fontObj=null){ const x = box.x * width; const y = height - (box.y * height) - (box.h * height)/2; page.drawText(text||'', { x, y, size, font: fontObj || undefined }); }
+      if(pagePos.name) drawText(pagePos.name, name, 12);
+      if(pagePos.cpf) drawText(pagePos.cpf, cpf, 12);
+      if(pagePos.company) drawText(pagePos.company, company, 12);
+      if(pagePos.phone) drawText(pagePos.phone, phone, 12);
+      if(pagePos.date) drawText(pagePos.date, date, 12);
+      if(pagePos.efetivo && efetivo){ const box = pagePos.efetivo; const x = box.x * width; const y = height - (box.y * height) - (box.h * height)/2; const size = Math.min(box.w*width, box.h*height) * 0.9; page.drawText('X', { x, y, size, font: fontBold }); }
+      if(pagePos.terceirizado && terceirizado){ const box = pagePos.terceirizado; const x = box.x * width; const y = height - (box.y * height) - (box.h * height)/2; const size = Math.min(box.w*width, box.h*height) * 0.9; page.drawText('X', { x, y, size, font: fontBold }); }
+      if(pagePos.signature && signatureDataUrl){
+        try{
+          const box = pagePos.signature; const x = box.x * width; const yTop = height - (box.y * height);
+          const pngBytes = dataURLToUint8Array(signatureDataUrl); const png = await pdfDoc.embedPng(pngBytes);
+          const boxW = box.w * width; const scale = (boxW / png.width) * SIGN_SCALE;
+          const imgW = png.width * scale; const imgH = png.height * scale;
+          const drawX = x + (boxW/2) - (imgW/2); const drawY = yTop - (box.h * height)/2 - (imgH/2);
+          page.drawImage(png, { x: drawX, y: drawY, width: imgW, height: imgH });
+        } catch(err){ console.error('Erro inserir assinatura', err); }
+      }
+    }
+
+    const metaStamp = new Date().toISOString();
+    pdfDoc.setProducer('HSE Assinatura Digital');
+    pdfDoc.setCreator('HSE Assinatura');
+    pdfDoc.setSubject('Documento assinado eletronicamente com evidências locais de integridade SHA-256');
+    pdfDoc.setKeywords(['assinatura-eletronica','integridade-sha256',`stamp:${metaStamp}`]);
+
+    const bytes = await pdfDoc.save();
+    return new Blob([bytes], { type: 'application/pdf' });
+  }
+
+  async function generatePdfCertWithData({ name, cpf, start, end, issue, signatureDataUrl }){
+    const { PDFDocument, StandardFonts } = PDFLib;
+    const pdfDoc = state.bytesCert ? await PDFDocument.load(state.bytesCert) : await PDFDocument.create();
+    if(!state.bytesCert) pdfDoc.addPage([595,842]);
+
+    let deliveryFont = null;
+    try{
+      const resp = await fetch('https://fonts.cdnfonts.com/s/10165/Delivery.woff');
+      if(resp.ok){ const fb = await resp.arrayBuffer(); deliveryFont = await pdfDoc.embedFont(fb); }
+    } catch(e){ console.warn('Não foi possível embutir Delivery (fallback).', e); }
+
+    const helvBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const helv = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const pages = pdfDoc.getPages();
+    for(let i=0;i<pages.length;i++){
+      const pageNum = i+1; const page = pages[i]; const width = page.getWidth(); const height = page.getHeight(); const pagePos = state.certPositions[pageNum] || {};
+      for(const key of Object.keys(pagePos)){
+        const box = pagePos[key]; const x = box.x * width; const y = height - (box.y * height) - (box.h * height)/2;
+        if(key.startsWith('cert_name')) page.drawText((name || '').toString().toUpperCase(), { x, y, size:22, font: deliveryFont || helvBold });
+        else if(key.startsWith('cert_cpf')) page.drawText(cpf || '', { x, y, size:22, font: deliveryFont || helv });
+        else if(key.startsWith('cert_start')) page.drawText(start || '', { x, y, size:22, font: deliveryFont || helv });
+        else if(key.startsWith('cert_end')) page.drawText(end || '', { x, y, size:22, font: deliveryFont || helv });
+        else if(key.startsWith('cert_issue')) page.drawText(issue || '', { x, y, size:22, font: deliveryFont || helv });
+        else if(key.startsWith('cert_signature') && signatureDataUrl){
+          try{
+            const pngBytes = dataURLToUint8Array(signatureDataUrl); const png = await pdfDoc.embedPng(pngBytes); const boxW = box.w * width;
+            const scale = Math.min(boxW / png.width, (box.h * height) / png.height) * 0.9;
+            const imgW = png.width * scale; const imgH = png.height * scale;
+            const drawX = x + (boxW/2) - (imgW/2); const drawY = (height - (box.y * height)) - (box.h * height)/2 - (imgH/2);
+            page.drawImage(png, { x: drawX, y: drawY, width: imgW, height: imgH });
+          } catch(err){ console.error('Erro inserir assinatura no cert', err); }
+        }
+      }
+    }
+
+    const metaStamp = new Date().toISOString();
+    pdfDoc.setProducer('HSE Assinatura Digital');
+    pdfDoc.setCreator('HSE Assinatura');
+    pdfDoc.setSubject('Certificado assinado eletronicamente com evidências locais de integridade SHA-256');
+    pdfDoc.setKeywords(['assinatura-eletronica','integridade-sha256',`stamp:${metaStamp}`]);
+
+    const bytes = await pdfDoc.save();
+    return new Blob([bytes], { type: 'application/pdf' });
+  }
+
+  function dataURLToUint8Array(dataURL){ const base64 = dataURL.split(',')[1]; const raw = atob(base64); const u8 = new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) u8[i]=raw.charCodeAt(i); return u8; }
+  function blobToBase64(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); }); }
+  function downloadBlob(blob, filename){ const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+  function makeDownloadFilename(name, cpf){ const safe = (name||'').replace(/[^a-z0-9]/gi,'_'); const safeCpf = (cpf||'').replace(/[^a-z0-9]/gi,'_'); return `${safe}_${safeCpf}.pdf`; }
+
+  async function insertSamplePdf(){ const { PDFDocument } = PDFLib; const doc = await PDFDocument.create(); const p = doc.addPage([595,842]); p.drawText('Documento de exemplo — teste', { x:50, y:800, size:18 }); const bytes = await doc.save(); state.bytes = bytes; await loadPdf(bytes); }
+
+  on($('downloadAllBtn'),'click', async ()=> {
+    try {
+      const items = state.signedQueue || [];
+      if(!items.length) { alert('Nenhuma assinatura encontrada para baixar.'); return; }
+      const zip = new JSZip();
+      items.forEach(it => { const name = it.filename || (`assinatura_${Date.now()}.pdf`); zip.file(name, it.base64, { base64: true }); });
+      (state.auditQueue || []).forEach(it => zip.file(it.filename, JSON.stringify(it.content, null, 2)));
+      zip.file('LEIA-ME-VALIDADE.txt', 'Este pacote contém assinatura eletrônica com evidências de integridade (SHA-256). Para assinatura digital qualificada (ICP-Brasil/PAdES), use backend com certificado e carimbo de tempo.');
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const ts = (new Date()).toISOString().replace(/[:]/g,'-');
+      downloadBlob(blob, `assinaturas_${ts}.zip`);
+    } catch(err){ console.error(err); alert('Erro ao gerar ZIP: ' + (err.message || err)); }
+  });
+
+  window._hse_state = state;
+})();
+</script>
+</body>
+</html>
